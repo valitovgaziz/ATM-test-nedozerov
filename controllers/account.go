@@ -7,29 +7,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/valitovgaziz/atm-test-nedozerov/models"
 	"github.com/valitovgaziz/atm-test-nedozerov/util"
-)
-
-// инициализация глобальных переменных
-var (
-	accounts = make(map[int]*models.Account)
-	AccMutex = sync.Mutex{}
-	NextID   = 1
+	"github.com/valitovgaziz/atm-test-nedozerov/services"
 )
 
 // create new account and return account id
 func createAccount(ctx *gin.Context) {
-	id := NextID
-	NextID++
-	accounts[id] = &models.Account{ID: id, Balance: 0.0}
+	var account *models.Account = nil
+
+	go services.CreateAccount(account)
 
 	// response
 	ctx.JSON(201, gin.H{
 		"message":    "Account created",
-		"account_id": id,
+		"account_id": account.ID,
 	})
-
-	// log operation
-	util.LogOperation("Crate Account", NextID-1)
 }
 
 // deposit to account and return new balance
@@ -49,20 +40,20 @@ func depositToAccount(c *gin.Context) {
 		return
 	}
 	// check if account is exists
-	account, exists := accounts[accountId]
+	exists := services.IsAccountExist(accountId)
 	if !exists {
 		c.JSON(404, gin.H{"error": "account not found"})
 		return
 	}
+
 	// deposit to account
-	if err := account.Deposit(json.Amount); err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
-		return
-	}
+	NewBalance := make(chan float64)
+	defer close(NewBalance)
+	go services.DepositToAccount(accountId, json.Amount)
 	// response
 	c.JSON(200, gin.H{
 		"message":     "Deposit successful",
-		"new_balance": account.GetBalance(),
+		"new_balance": <-NewBalance,
 	})
 }
 
