@@ -16,10 +16,8 @@ var (
 	NextID   = 1
 )
 
-// добавление нового аккаунта
+// create new account and return account id
 func createAccount(ctx *gin.Context) {
-	AccMutex.Lock()
-	defer AccMutex.Unlock()
 	id := NextID
 	NextID++
 	accounts[id] = &models.Account{ID: id, Balance: 0.0}
@@ -34,7 +32,7 @@ func createAccount(ctx *gin.Context) {
 	util.LogOperation("Crate Account", NextID-1)
 }
 
-// пополнение счета в аккаунте
+// deposit to account and return new balance
 func depositToAccount(c *gin.Context) {
 	// convert id string type param to int
 	accountId, err := strconv.Atoi(c.Param("id"))
@@ -68,7 +66,7 @@ func depositToAccount(c *gin.Context) {
 	})
 }
 
-// снятие средств со счета
+// withdraw from account and return new balance
 func withdrawFromAccount(c *gin.Context) {
 	// convert id string type param to int and check error
 	accountId, err := strconv.Atoi(c.Param("id"))
@@ -90,7 +88,7 @@ func withdrawFromAccount(c *gin.Context) {
 		c.JSON(404, gin.H{"error": "account not found"})
 		return
 	}
-	// сняте с баланса
+	// withdrop from account
 	if err := account.Withdraw(json.Amount); err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -102,7 +100,7 @@ func withdrawFromAccount(c *gin.Context) {
 	})
 }
 
-// получение баланса аккаунта
+// get account's balance
 func getAccountBalance(c *gin.Context) {
 	// convert id string type param to int and check error
 	accountId, err := strconv.Atoi(c.Param("id"))

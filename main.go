@@ -5,6 +5,6 @@ import (
 )
 
 func main() {
-	router := controllers.SetupRouter() // создание маршрутизатора
-	router.Run(":8080")                 // запуск сервера на порту 8080
+	router := controllers.SetupRouter() // create routing
+	router.Run(":8080")                 // start server on port 8080
 }
