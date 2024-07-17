@@ -6,10 +6,13 @@ import (
 )
 
 func main() {
+	// set up default gin engine
 	r := gin.Default()
+	// set up routings
 	r.POST("/accounts", controllers.CreateAccount)
 	r.POST("/accounts/:id/deposit", controllers.DepositToAccount)
 	r.POST("/accounts/:id/withdraw", controllers.WithdrawFromAccount)
 	r.GET("/accounts/:id/balance", controllers.GetAccountBalance)
-	r.Run(":8080")                 // start server on port 8080
+	// run gin engine and listen on 8080
+	r.Run(":8080")
 }
