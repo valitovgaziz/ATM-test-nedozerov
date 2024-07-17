@@ -2,29 +2,26 @@ package controllers
 
 import (
 	"strconv"
-	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/valitovgaziz/atm-test-nedozerov/models"
-	"github.com/valitovgaziz/atm-test-nedozerov/util"
 	"github.com/valitovgaziz/atm-test-nedozerov/services"
 )
 
 // create new account and return account id
-func createAccount(ctx *gin.Context) {
-	var account *models.Account = nil
-
-	go services.CreateAccount(account)
-
+func CreateAccount(ctx *gin.Context) {
+	resultChan := make(chan models.Account, 1)
+	go services.CreateAccount(resultChan)
+	resultValue := <-resultChan
 	// response
 	ctx.JSON(201, gin.H{
 		"message":    "Account created",
-		"account_id": account.ID,
+		"account_id": &resultValue,
 	})
 }
 
 // deposit to account and return new balance
-func depositToAccount(c *gin.Context) {
+func DepositToAccount(c *gin.Context) {
 	// convert id string type param to int
 	accountId, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -39,6 +36,11 @@ func depositToAccount(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "bad request"})
 		return
 	}
+	// check for amount not negative, if so return error
+	if json.Amount < 0 {
+		c.JSON(400, gin.H{"error": "amount must be positive"})
+		return
+	}
 	// check if account is exists
 	exists := services.IsAccountExist(accountId)
 	if !exists {
@@ -47,18 +49,26 @@ func depositToAccount(c *gin.Context) {
 	}
 
 	// deposit to account
-	NewBalance := make(chan float64)
-	defer close(NewBalance)
-	go services.DepositToAccount(accountId, json.Amount)
-	// response
-	c.JSON(200, gin.H{
-		"message":     "Deposit successful",
-		"new_balance": <-NewBalance,
-	})
+	resultChan := make(chan float64, 1)
+	errorChan := make(chan error, 1)
+	defer close(resultChan)
+	defer close(errorChan)
+	go services.DepositToAccount(accountId, json.Amount, resultChan, errorChan)
+
+	// return new balance or error
+	select {
+	case newBalance := <-resultChan:
+		c.JSON(200, gin.H{
+			"message":     "Deposit successful",
+			"new_balance": newBalance,
+		})
+	case err := <-errorChan:
+		c.JSON(404, gin.H{"error": err.Error()})
+	}
 }
 
 // withdraw from account and return new balance
-func withdrawFromAccount(c *gin.Context) {
+func WithdrawFromAccount(c *gin.Context) {
 	// convert id string type param to int and check error
 	accountId, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -73,26 +83,38 @@ func withdrawFromAccount(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "bad request"})
 		return
 	}
+	// check for amount not negative, if so return error
+	if json.Amount < 0 {
+		c.JSON(400, gin.H{"error": "amount must be positive"})
+		return
+	}
 	// check if account is exists
-	account, exists := accounts[accountId]
+	exists := services.IsAccountExist(accountId)
 	if !exists {
 		c.JSON(404, gin.H{"error": "account not found"})
 		return
 	}
 	// withdrop from account
-	if err := account.Withdraw(json.Amount); err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
-		return
+	resultChan := make(chan float64, 1)
+	errorChan := make(chan error, 1)
+	defer close(resultChan)
+	defer close(errorChan)
+	go services.WithdrawFromAccount(accountId, json.Amount, resultChan, errorChan)
+	// return new balance or error
+	select {
+	case newBalance := <-resultChan:
+		c.JSON(200, gin.H{
+			"message":     "Withdraw successful",
+			"new_balance": newBalance,
+		})
+	case err := <-errorChan:
+		c.JSON(404, gin.H{"error": err.Error()})
+
 	}
-	// response
-	c.JSON(200, gin.H{
-		"message":     "Withdraw successful",
-		"new_balance": account.GetBalance(),
-	})
 }
 
 // get account's balance
-func getAccountBalance(c *gin.Context) {
+func GetAccountBalance(c *gin.Context) {
 	// convert id string type param to int and check error
 	accountId, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -100,23 +122,24 @@ func getAccountBalance(c *gin.Context) {
 		return
 	}
 	// check if account is exists
-	account, exists := accounts[accountId]
+	exists := services.IsAccountExist(accountId)
 	if !exists {
 		c.JSON(404, gin.H{"error": "account not found"})
 		return
 	}
-	// response
-	c.JSON(200, gin.H{
-		"account_id": accountId,
-		"balance":    account.GetBalance(),
-	})
-}
-
-func SetupRouter() *gin.Engine {
-	r := gin.Default()
-	r.POST("/accounts", createAccount)
-	r.POST("/accounts/:id/deposit", depositToAccount)
-	r.POST("/accounts/:id/withdraw", withdrawFromAccount)
-	r.GET("/accounts/:id/balance", getAccountBalance)
-	return r
+	// Get balance
+	resultChan := make(chan float64, 1)
+	errorChan := make(chan error, 1)
+	defer close(resultChan)
+	defer close(errorChan)
+	go services.GetAccountBalance(accountId, resultChan, errorChan)
+	// return balance or error
+	select {
+	case balance := <-resultChan:
+		c.JSON(200, gin.H{
+			"balance": balance,
+		})
+	case err := <-errorChan:
+		c.JSON(404, gin.H{"error": err.Error()})
+	}
 }

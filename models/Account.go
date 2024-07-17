@@ -2,26 +2,24 @@ package models
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/valitovgaziz/atm-test-nedozerov/util"
 )
 
-// Account реализует интерфейс BankAccount
+// Account implement the BankAccount interface
 type Account struct {
 	ID      int
-	Balance float64
-	Lock    sync.Mutex
+	Balance float64 `json:"balance"`
 }
 
-// Deposit позволяет вносить средства на баланс
+// Deposits money to the account
 func (acc *Account) Deposit(amount float64) error {
 	acc.Balance += amount
 	util.LogOperation("Deposit", acc.ID)
 	return nil
 }
 
-// Withdraw позволяет снимать средства с баланса
+// Withdraws money from account
 func (acc *Account) Withdraw(amount float64) error {
 	if amount > acc.Balance {
 		return fmt.Errorf("insufficient funds")
@@ -31,7 +29,7 @@ func (acc *Account) Withdraw(amount float64) error {
 	return nil
 }
 
-// GetBalance возвращает текущий баланс
+// GetBalance returns current account balance
 func (acc *Account) GetBalance() float64 {
 	util.LogOperation("GetBalance", acc.ID)
 	return acc.Balance
