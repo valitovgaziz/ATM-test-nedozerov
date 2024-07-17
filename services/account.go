@@ -10,7 +10,7 @@ import (
 // инициализация глобальных переменных
 var (
 	accounts = make(map[int]*models.Account)
-	accMutex = sync.Mutex{}
+	accMutex = sync.RWMutex{}
 	nextID   = 1
 )
 
